@@ -154,6 +154,10 @@ function titleFromPath(filePath = "") {
   return path.posix.basename(filePath, path.posix.extname(filePath)) || "Vault";
 }
 
+function normalizeLookupValue(value = "") {
+  return value.trim().toLowerCase().replace(/[-_\s]+/g, " ");
+}
+
 function normalizeRequestedPath(requestedPath = "") {
   let normalizedPath;
 
@@ -175,6 +179,65 @@ function normalizeRequestedPath(requestedPath = "") {
   }
 
   return normalizedPath;
+}
+
+function buildFileTree(files, currentPath = "") {
+  const root = [];
+
+  for (const filePath of files) {
+    const parts = filePath.split("/");
+    let level = root;
+    let folderPath = "";
+
+    for (const [index, part] of parts.entries()) {
+      const isFile = index === parts.length - 1;
+
+      if (isFile) {
+        level.push({
+          type: "file",
+          name: part,
+          path: filePath,
+          active: filePath === currentPath,
+        });
+        continue;
+      }
+
+      folderPath = folderPath ? `${folderPath}/${part}` : part;
+      let folder = level.find((node) => node.type === "folder" && node.path === folderPath);
+
+      if (!folder) {
+        folder = {
+          type: "folder",
+          name: part,
+          path: folderPath,
+          open: currentPath === folderPath || currentPath.startsWith(`${folderPath}/`),
+          children: [],
+        };
+        level.push(folder);
+      }
+
+      level = folder.children;
+    }
+  }
+
+  const sortNodes = (nodes) => {
+    nodes.sort((left, right) => {
+      if (left.type !== right.type) {
+        return left.type === "folder" ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name);
+    });
+
+    for (const node of nodes) {
+      if (node.type === "folder") {
+        sortNodes(node.children);
+      }
+    }
+  };
+
+  sortNodes(root);
+  return root;
 }
 
 function rewriteWikiLinks(content) {
@@ -234,6 +297,20 @@ function relativeMarkdownTarget(target, currentPath) {
   const suffix = rawHash ? `#${rawHash}` : "";
 
   return `${toVaultUrl(withExtension)}${suffix}`;
+}
+
+function findUniqueTitleMatch(requestedPath, markdownFiles) {
+  const requestedTitle = normalizeLookupValue(titleFromPath(requestedPath));
+
+  if (!requestedTitle) {
+    return null;
+  }
+
+  const matches = markdownFiles.filter(
+    (filePath) => normalizeLookupValue(titleFromPath(filePath)) === requestedTitle,
+  );
+
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function rewriteStandardMarkdownLinks(content, currentPath) {
@@ -383,7 +460,30 @@ function resolvePagePath(requestedPath, markdownFiles) {
     }
   }
 
+  for (const candidate of candidates) {
+    const fullPathWithoutExtension = candidate.replace(/\.md$/i, "");
+    const pathMatches = markdownFiles.filter((filePath) => {
+      const withoutExtension = filePath.replace(/\.md$/i, "");
+      return normalizeLookupValue(withoutExtension) === normalizeLookupValue(fullPathWithoutExtension);
+    });
+
+    if (pathMatches.length === 1) {
+      return pathMatches[0];
+    }
+
+    const titleMatch = findUniqueTitleMatch(candidate, markdownFiles);
+
+    if (titleMatch) {
+      return titleMatch;
+    }
+  }
+
   return null;
+}
+
+function normalizeContentForSave(submittedContent, existingContent) {
+  const lineEnding = existingContent.includes("\r\n") ? "\r\n" : "\n";
+  return submittedContent.replace(/\r?\n/g, lineEnding);
 }
 
 async function readFileContent(req, filePath) {
@@ -417,6 +517,7 @@ async function renderPage(req, res, requestedPath = "") {
       currentPath: "",
       repo: selectedRepoFrom(req),
       files: markdownFiles,
+      fileTree: buildFileTree(markdownFiles),
     });
   }
 
@@ -428,6 +529,7 @@ async function renderPage(req, res, requestedPath = "") {
     currentPath: pagePath,
     repo: selectedRepoFrom(req),
     files: markdownFiles,
+    fileTree: buildFileTree(markdownFiles, pagePath),
   });
 }
 
@@ -581,7 +683,7 @@ app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
 
     const selectedRepo = selectedRepoFrom(req);
     const octokit = createOctokit(req);
-    const { sha } = await readFileContent(req, pagePath);
+    const { sha, content } = await readFileContent(req, pagePath);
 
     await octokit.rest.repos.createOrUpdateFileContents({
       owner: selectedRepo.owner,
@@ -589,7 +691,10 @@ app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
       branch: selectedRepo.defaultBranch,
       path: pagePath,
       message: `Updated ${titleFromPath(pagePath)} on Pumice`,
-      content: Buffer.from(req.body.content || "", "utf8").toString("base64"),
+      content: Buffer.from(
+        normalizeContentForSave(req.body.content || "", content),
+        "utf8",
+      ).toString("base64"),
       sha,
     });
 
@@ -637,7 +742,7 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-export { app, renderMarkdown, resolvePagePath, rewriteMarkdown };
+export { app, buildFileTree, normalizeContentForSave, renderMarkdown, resolvePagePath, rewriteMarkdown };
 export function setOctokitFactory(factory) {
   octokitFactory = factory;
 }

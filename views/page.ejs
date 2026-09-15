@@ -17,11 +17,9 @@
           <% } %>
           <a href="/repos">Change repository</a>
         </div>
-        <nav class="file-list">
-          <% files.forEach((file) => { %>
-            <a class="<%= file === currentPath ? 'active' : '' %>" href="/vault/<%= file.split('/').map(encodeURIComponent).join('/') %>">
-              <%= file %>
-            </a>
+        <nav class="file-tree" aria-label="Vault files">
+          <% fileTree.forEach((node) => { %>
+            <%- include("partials/file-tree-node", { node }) %>
           <% }) %>
         </nav>
       </aside>

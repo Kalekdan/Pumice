@@ -80,14 +80,47 @@ input:focus-visible {
   color: #9ca3af;
 }
 
-.file-list {
+.file-tree,
+.tree-children {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.file-tree {
   margin-top: 1.5rem;
 }
 
-.file-list a.active {
+.tree-folder summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+}
+
+.tree-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-folder summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.tree-folder[open] > summary::before {
+  content: "▾";
+}
+
+.tree-children {
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+}
+
+.tree-file {
+  display: block;
+}
+
+.tree-file.active {
   color: #fff;
   font-weight: 700;
 }

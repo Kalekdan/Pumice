@@ -3,13 +3,34 @@ import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
 
-const { app, resolvePagePath, rewriteMarkdown, renderMarkdown, setOctokitFactory, resetOctokitFactory } =
+const {
+  app,
+  buildFileTree,
+  normalizeContentForSave,
+  resolvePagePath,
+  rewriteMarkdown,
+  renderMarkdown,
+  setOctokitFactory,
+  resetOctokitFactory,
+} =
   await import("./server.js");
 
 test("resolvePagePath prefers README for the vault root", () => {
   const files = ["notes/Alpha.md", "README.md", "zeta.md"];
 
   assert.equal(resolvePagePath("", files), "README.md");
+});
+
+test("resolvePagePath can uniquely match a file by title across folders", () => {
+  const files = ["daily/Journal.md", "notes/Linked Page.md", "other/Else.md"];
+
+  assert.equal(resolvePagePath("Linked Page", files), "notes/Linked Page.md");
+});
+
+test("resolvePagePath does not guess when multiple files share the same title", () => {
+  const files = ["notes/Linked Page.md", "archive/Linked Page.md"];
+
+  assert.equal(resolvePagePath("Linked Page", files), null);
 });
 
 test("rewriteMarkdown rewrites wiki links and markdown links to vault routes", () => {
@@ -38,6 +59,28 @@ test("renderMarkdown preserves safe in-app vault links", () => {
   const html = renderMarkdown("[[Linked Page]]", "notes/current.md");
 
   assert.match(html, /href="\/vault\/Linked%20Page\.md"/);
+});
+
+test("normalizeContentForSave preserves the existing file line endings", () => {
+  assert.equal(
+    normalizeContentForSave("first\nsecond\nthird", "first\r\nsecond\r\nthird"),
+    "first\r\nsecond\r\nthird",
+  );
+});
+
+test("buildFileTree creates nested folders and marks current ancestors open", () => {
+  const tree = buildFileTree(
+    ["README.md", "notes/alpha.md", "notes/nested/beta.md"],
+    "notes/nested/beta.md",
+  );
+  const notesFolder = tree.find((node) => node.type === "folder" && node.name === "notes");
+  const nestedFolder = notesFolder.children.find(
+    (node) => node.type === "folder" && node.name === "nested",
+  );
+
+  assert.equal(notesFolder.open, true);
+  assert.equal(nestedFolder.open, true);
+  assert.equal(nestedFolder.children[0].path, "notes/nested/beta.md");
 });
 
 test("home page renders successfully without GitHub credentials", async () => {
