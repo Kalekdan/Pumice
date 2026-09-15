@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edit <%= pageTitle %> · Pumice</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell shell--narrow">
+      <section class="card">
+        <div class="topbar">
+          <div>
+            <h1>Edit <%= pageTitle %></h1>
+            <p><%= repo.owner %>/<%= repo.repo %> · <%= currentPath %></p>
+          </div>
+          <a href="/vault/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Cancel</a>
+        </div>
+        <form action="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>" method="post" class="editor-form">
+          <textarea name="content" rows="24"><%= fileContent %></textarea>
+          <button class="button" type="submit">Save changes</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

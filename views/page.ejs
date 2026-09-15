@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= pageTitle %> · Pumice</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell shell--wide">
+      <aside class="sidebar">
+        <div class="sidebar__header">
+          <h1>Pumice</h1>
+          <% if (repo) { %>
+            <p><%= repo.owner %>/<%= repo.repo %></p>
+          <% } %>
+          <a href="/repos">Change repository</a>
+        </div>
+        <nav class="file-list">
+          <% files.forEach((file) => { %>
+            <a class="<%= file === currentPath ? 'active' : '' %>" href="/vault/<%= file.split('/').map(encodeURIComponent).join('/') %>">
+              <%= file %>
+            </a>
+          <% }) %>
+        </nav>
+      </aside>
+      <main class="page">
+        <header class="page__header">
+          <div>
+            <h2><%= pageTitle %></h2>
+            <% if (currentPath) { %>
+              <p><%= currentPath %></p>
+            <% } %>
+          </div>
+          <% if (currentPath) { %>
+            <a class="button" href="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Edit</a>
+          <% } %>
+        </header>
+        <article class="markdown"><%- bodyHtml %></article>
+      </main>
+    </div>
+  </body>
+</html>

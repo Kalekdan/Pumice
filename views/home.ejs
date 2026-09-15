@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pumice</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell shell--narrow">
+      <section class="card">
+        <h1>Pumice</h1>
+        <p>Browse and edit your Obsidian markdown vault from a private GitHub repository.</p>
+
+        <% if (!authConfigured) { %>
+          <p class="notice">Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and SESSION_SECRET to enable login.</p>
+        <% } %>
+
+        <% if (isAuthenticated) { %>
+          <p>Signed in as <strong><%= user.displayName %></strong>.</p>
+          <div class="actions">
+            <a class="button" href="<%= selectedRepo ? '/vault' : '/repos' %>">
+              <%= selectedRepo ? 'Open vault' : 'Choose repository' %>
+            </a>
+            <form action="/logout" method="post">
+              <button class="button button--secondary" type="submit">Log out</button>
+            </form>
+          </div>
+        <% } else { %>
+          <a class="button" href="/auth/github">Log in with GitHub</a>
+        <% } %>
+      </section>
+    </main>
+  </body>
+</html>
