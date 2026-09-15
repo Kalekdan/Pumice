@@ -92,6 +92,40 @@ test("buildFileTree creates nested folders and marks current ancestors open", ()
   assert.equal(nestedFolder.children[0].path, "notes/nested/beta.md");
 });
 
+test("page template renders nested file tree folders", async () => {
+  const html = await new Promise((resolve, reject) => {
+    app.render(
+      "page",
+      {
+        pageTitle: "Beta",
+        bodyHtml: "<p>Body</p>",
+        currentPath: "notes/nested/beta.md",
+        repo: { owner: "Kalekdan", repo: "Pumice" },
+        files: ["README.md", "notes/alpha.md", "notes/nested/beta.md"],
+        fileTree: buildFileTree(
+          ["README.md", "notes/alpha.md", "notes/nested/beta.md"],
+          "notes/nested/beta.md",
+        ),
+        vaultUrl: (filePath) => `/vault/${filePath}`,
+        editUrl: (filePath) => `/edit/${filePath}`,
+      },
+      (error, rendered) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(rendered);
+      },
+    );
+  });
+
+  assert.match(html, /<details class="tree-folder" open>/);
+  assert.match(html, />nested</);
+  assert.match(html, /class="tree-file active"/);
+  assert.match(html, /href="\/vault\/notes\/nested\/beta\.md"/);
+});
+
 test("home page renders successfully without GitHub credentials", async () => {
   const server = app.listen(0);
   const address = server.address();

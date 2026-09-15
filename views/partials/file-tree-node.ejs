@@ -3,7 +3,7 @@
     <summary><%= node.name %></summary>
     <div class="tree-children">
       <% node.children.forEach((child) => { %>
-        <%- include("partials/file-tree-node", { node: child }) %>
+        <%- include("file-tree-node", { node: child }) %>
       <% }) %>
     </div>
   </details>
