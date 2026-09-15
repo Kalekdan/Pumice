@@ -207,7 +207,67 @@ test("repository selection shows an error when the GitHub lookup fails", async (
     const html = await response.text();
 
     assert.equal(response.status, 500);
-    assert.match(html, /GitHub lookup failed/);
+    assert.match(html, /Something went wrong while processing your request/);
+  } finally {
+    resetOctokitFactory();
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("repository list renders paginated results", async () => {
+  setOctokitFactory(() => ({
+    paginate: async () => [
+      {
+        owner: { login: "Kalekdan" },
+        name: "vault-one",
+        full_name: "Kalekdan/vault-one",
+        private: true,
+      },
+      {
+        owner: { login: "Kalekdan" },
+        name: "vault-two",
+        full_name: "Kalekdan/vault-two",
+        private: false,
+      },
+    ],
+    rest: {
+      repos: {
+        get: async () => ({ data: { default_branch: "main" } }),
+      },
+    },
+  }));
+
+  const server = app.listen(0);
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const signInResponse = await fetch(`${baseUrl}/test/sign-in`, {
+      headers: { host: `localhost:${address.port}` },
+    });
+    const cookie = signInResponse.headers.get("set-cookie").split(";", 1)[0];
+
+    const response = await fetch(`${baseUrl}/repos`, {
+      headers: {
+        cookie,
+        host: `localhost:${address.port}`,
+      },
+    });
+    const html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /Kalekdan\/vault-one/);
+    assert.match(html, /Kalekdan\/vault-two/);
+    assert.match(html, /Available repositories/);
   } finally {
     resetOctokitFactory();
     await new Promise((resolve, reject) => {

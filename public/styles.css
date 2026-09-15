@@ -97,6 +97,17 @@ input:focus-visible {
   gap: 1rem;
 }
 
+.repo-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.repo-group legend {
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+}
+
 .repo-option {
   display: flex;
   gap: 0.75rem;

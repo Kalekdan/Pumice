@@ -131,8 +131,6 @@ app.use((req, res, next) => {
     });
   }
 
-  req.session.csrfToken = createCsrfToken();
-  res.locals.csrfToken = req.session.csrfToken;
   return next();
 });
 
@@ -305,6 +303,9 @@ function renderMarkdown(content, currentPath) {
       img: ["src", "alt", "title"],
       input: ["type", "checked", "disabled"],
     },
+    allowedSchemes: ["http", "https", "mailto"],
+    allowedSchemesAppliedToAttributes: ["href", "src"],
+    allowProtocolRelative: false,
   });
 }
 
@@ -594,8 +595,9 @@ app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
 });
 
 app.use((error, _req, res, _next) => {
+  console.error(error);
   res.status(500).render("error", {
-    message: error.message || "Unexpected error",
+    message: "Something went wrong while processing your request.",
   });
 });
 

@@ -15,20 +15,23 @@
         </div>
         <form action="/repos/select" method="post" class="repo-list">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-          <% repos.forEach((repo) => { %>
-            <label class="repo-option">
-              <input
-                type="radio"
-                name="repository"
-                value="<%= repo.owner.login %>/<%= repo.name %>"
-                <%= selectedRepo && selectedRepo.owner === repo.owner.login && selectedRepo.repo === repo.name ? 'checked' : '' %>
-              />
-              <span>
-                <strong><%= repo.full_name %></strong>
-                <small><%= repo.private ? 'Private' : 'Public' %></small>
-              </span>
-            </label>
-          <% }) %>
+          <fieldset class="repo-group">
+            <legend>Available repositories</legend>
+            <% repos.forEach((repo) => { %>
+              <label class="repo-option">
+                <input
+                  type="radio"
+                  name="repository"
+                  value="<%= repo.owner.login %>/<%= repo.name %>"
+                  <%= selectedRepo && selectedRepo.owner === repo.owner.login && selectedRepo.repo === repo.name ? 'checked' : '' %>
+                />
+                <span>
+                  <strong><%= repo.full_name %></strong>
+                  <small><%= repo.private ? 'Private' : 'Public' %></small>
+                </span>
+              </label>
+            <% }) %>
+          </fieldset>
 
           <button class="button" type="submit">Use selected repository</button>
         </form>
