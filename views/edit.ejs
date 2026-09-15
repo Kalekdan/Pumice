@@ -14,9 +14,9 @@
             <h1>Edit <%= pageTitle %></h1>
             <p><%= repo.owner %>/<%= repo.repo %> · <%= currentPath %></p>
           </div>
-          <a href="/vault/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Cancel</a>
+          <a href="<%= vaultUrl(currentPath) %>">Cancel</a>
         </div>
-        <form action="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>" method="post" class="editor-form">
+        <form action="<%= editUrl(currentPath) %>" method="post" class="editor-form">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <label for="content">Markdown content</label>
           <textarea id="content" name="content" rows="24"><%= fileContent %></textarea>

@@ -32,7 +32,7 @@
             <% } %>
           </div>
           <% if (currentPath) { %>
-            <a class="button" href="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Edit</a>
+            <a class="button" href="<%= editUrl(currentPath) %>">Edit</a>
           <% } %>
         </header>
         <article class="markdown" aria-labelledby="page-title"><%- bodyHtml %></article>

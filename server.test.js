@@ -67,6 +67,10 @@ test("normalizeContentForSave preserves the existing file line endings", () => {
     normalizeContentForSave("first\nsecond\nthird", "first\r\nsecond\r\nthird"),
     "first\r\nsecond\r\nthird",
   );
+  assert.equal(
+    normalizeContentForSave("first\r\nsecond\r\nthird", "first\nsecond\nthird"),
+    "first\nsecond\nthird",
+  );
 });
 
 test("buildFileTree creates nested folders and marks current ancestors open", () => {

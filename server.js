@@ -119,6 +119,8 @@ app.use("/vault", authRateLimit);
 app.use("/edit", authRateLimit);
 app.use((req, res, next) => {
   res.locals.csrfToken = csrfTokenFor(req);
+  res.locals.vaultUrl = toVaultUrl;
+  res.locals.editUrl = toEditUrl;
   next();
 });
 app.use((req, res, next) => {
@@ -422,7 +424,9 @@ async function listMarkdownFiles(req) {
   });
 
   return treeResponse.data.tree
-    .filter((item) => item.type === "blob" && /\.md$/i.test(item.path))
+    .filter(
+      (item) => item.type === "blob" && typeof item.path === "string" && /\.md$/i.test(item.path),
+    )
     .map((item) => item.path)
     .sort((left, right) => left.localeCompare(right));
 }
@@ -509,12 +513,24 @@ async function readFileContent(req, filePath) {
 
 async function renderPage(req, res, requestedPath = "") {
   const markdownFiles = await listMarkdownFiles(req);
+  
+  if (!markdownFiles.length) {
+    return res.status(404).render("page", {
+      pageTitle: "Vault",
+      bodyHtml: "<p>No markdown pages were found in this repository.</p>",
+      currentPath: "",
+      repo: selectedRepoFrom(req),
+      files: markdownFiles,
+      fileTree: buildFileTree(markdownFiles),
+    });
+  }
+
   const pagePath = resolvePagePath(requestedPath, markdownFiles);
 
   if (!pagePath) {
     return res.status(404).render("page", {
-      pageTitle: "Vault",
-      bodyHtml: "<p>No markdown pages were found in this repository.</p>",
+      pageTitle: "Page not found",
+      bodyHtml: "<p>The requested markdown page could not be found in this repository.</p>",
       currentPath: "",
       repo: selectedRepoFrom(req),
       files: markdownFiles,
