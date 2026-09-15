@@ -11,11 +11,20 @@ body {
 
 a {
   color: #93c5fd;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 a:hover {
-  text-decoration: underline;
+  color: #bfdbfe;
+}
+
+a:focus-visible,
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
 }
 
 .shell {
@@ -113,6 +122,7 @@ a:hover {
   color: #fff;
   border: 0;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .button--secondary {

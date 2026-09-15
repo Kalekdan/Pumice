@@ -112,6 +112,10 @@ function csrfTokenFor(req) {
 }
 
 app.use(rateLimit({ windowMs: 60_000, max: 180 }));
+app.use("/auth", authRateLimit);
+app.use("/repos", authRateLimit);
+app.use("/vault", authRateLimit);
+app.use("/edit", authRateLimit);
 app.use((req, res, next) => {
   res.locals.csrfToken = csrfTokenFor(req);
   next();
@@ -328,15 +332,10 @@ async function listMarkdownFiles(req) {
   }
 
   const octokit = createOctokit(req);
-  const branchResponse = await octokit.rest.repos.getBranch({
-    owner: selectedRepo.owner,
-    repo: selectedRepo.repo,
-    branch: selectedRepo.defaultBranch,
-  });
   const treeResponse = await octokit.rest.git.getTree({
     owner: selectedRepo.owner,
     repo: selectedRepo.repo,
-    tree_sha: branchResponse.data.commit.commit.tree.sha,
+    tree_sha: selectedRepo.defaultBranch,
     recursive: "1",
   });
 
@@ -437,7 +436,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/auth/github", authRateLimit, (req, res, next) => {
+app.get("/auth/github", (req, res, next) => {
   if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
     return res.status(500).render("home", {
       isAuthenticated: false,
@@ -452,12 +451,11 @@ app.get("/auth/github", authRateLimit, (req, res, next) => {
 
 app.get(
   "/auth/github/callback",
-  authRateLimit,
   passport.authenticate("github", { failureRedirect: "/" }),
   (_req, res) => res.redirect("/repos"),
 );
 
-app.post("/logout", authRateLimit, (req, res, next) => {
+app.post("/logout", (req, res, next) => {
   req.logout((error) => {
     if (error) {
       return next(error);
@@ -471,17 +469,17 @@ app.post("/logout", authRateLimit, (req, res, next) => {
   });
 });
 
-app.get("/repos", authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.get("/repos", ensureAuthenticated, async (req, res, next) => {
   try {
     const octokit = createOctokit(req);
-    const reposResponse = await octokit.rest.repos.listForAuthenticatedUser({
+    const repos = await octokit.paginate(octokit.rest.repos.listForAuthenticatedUser, {
       affiliation: "owner,collaborator",
       per_page: 100,
       sort: "updated",
     });
 
     res.render("repos", {
-      repos: reposResponse.data,
+      repos,
       selectedRepo: selectedRepoFrom(req),
     });
   } catch (error) {
@@ -489,7 +487,7 @@ app.get("/repos", authRateLimit, ensureAuthenticated, async (req, res, next) => 
   }
 });
 
-app.post("/repos/select", authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.post("/repos/select", ensureAuthenticated, async (req, res, next) => {
   try {
     const [owner, repo] = (req.body.repository || "").split("/");
 
@@ -512,7 +510,7 @@ app.post("/repos/select", authRateLimit, ensureAuthenticated, async (req, res, n
   }
 });
 
-app.get("/vault", authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.get("/vault", ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -524,7 +522,7 @@ app.get("/vault", authRateLimit, ensureAuthenticated, async (req, res, next) => 
   }
 });
 
-app.get(/^\/vault\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.get(/^\/vault\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -536,7 +534,7 @@ app.get(/^\/vault\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, 
   }
 });
 
-app.get(/^\/edit\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.get(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -562,7 +560,7 @@ app.get(/^\/edit\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, n
   }
 });
 
-app.post(/^\/edit\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
+app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -602,6 +600,8 @@ app.use((error, _req, res, _next) => {
 });
 
 if (process.env.NODE_ENV === "test") {
+  app.use("/test", authRateLimit);
+
   app.get("/test/sign-in", (req, res, next) => {
     req.login(
       {

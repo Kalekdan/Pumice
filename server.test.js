@@ -63,6 +63,7 @@ test("home page renders successfully without GitHub credentials", async () => {
 
 test("repository selection persists the chosen repo in session", async () => {
   setOctokitFactory(() => ({
+    paginate: async () => [],
     rest: {
       repos: {
         get: async () => ({ data: { default_branch: "main" } }),
@@ -155,6 +156,60 @@ test("repository selection rejects invalid values", async () => {
     assert.equal(response.status, 302);
     assert.equal(response.headers.get("location"), "/repos");
   } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("repository selection shows an error when the GitHub lookup fails", async () => {
+  setOctokitFactory(() => ({
+    paginate: async () => [],
+    rest: {
+      repos: {
+        get: async () => {
+          throw new Error("GitHub lookup failed");
+        },
+      },
+    },
+  }));
+
+  const server = app.listen(0);
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const signInResponse = await fetch(`${baseUrl}/test/sign-in`, {
+      headers: { host: `localhost:${address.port}` },
+    });
+    const cookie = signInResponse.headers.get("set-cookie").split(";", 1)[0];
+    const { csrfToken } = await signInResponse.json();
+
+    const response = await fetch(`${baseUrl}/repos/select`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie,
+        host: `localhost:${address.port}`,
+      },
+      body: new URLSearchParams({
+        _csrf: csrfToken,
+        repository: "Kalekdan/vault",
+      }),
+    });
+    const html = await response.text();
+
+    assert.equal(response.status, 500);
+    assert.match(html, /GitHub lookup failed/);
+  } finally {
+    resetOctokitFactory();
     await new Promise((resolve, reject) => {
       server.close((error) => {
         if (error) {
