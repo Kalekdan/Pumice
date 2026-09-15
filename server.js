@@ -53,12 +53,12 @@ if (GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET) {
         scope: ["read:user", "repo"],
         passReqToCallback: true,
       },
-      async (req, accessToken, _refreshToken, profile, done) => {
-        req.session.accessToken = accessToken;
+      async (_req, accessToken, _refreshToken, profile, done) => {
         done(null, {
           id: profile.id,
           username: profile.username,
           displayName: profile.displayName || profile.username,
+          accessToken,
         });
       },
     ),
@@ -74,6 +74,8 @@ marked.setOptions({
 });
 
 const rateLimitState = new Map();
+const authRateLimit = rateLimit({ windowMs: 60_000, max: 60 });
+let octokitFactory = (req) => new Octokit({ auth: req.user?.accessToken });
 
 function rateLimit({ windowMs, max }) {
   return (req, res, next) => {
@@ -151,10 +153,16 @@ function titleFromPath(filePath = "") {
 }
 
 function normalizeRequestedPath(requestedPath = "") {
-  let normalizedPath = requestedPath
-    .split("/")
-    .map((part) => decodeURIComponent(part))
-    .join("/");
+  let normalizedPath;
+
+  try {
+    normalizedPath = requestedPath
+      .split("/")
+      .map((part) => decodeURIComponent(part))
+      .join("/");
+  } catch {
+    return null;
+  }
 
   while (normalizedPath.startsWith("/")) {
     normalizedPath = normalizedPath.slice(1);
@@ -212,36 +220,72 @@ function relativeMarkdownTarget(target, currentPath) {
       : path.posix.join(path.posix.dirname(currentPath), basePath),
   );
 
+  if (
+    basePath.split("/").includes("..") ||
+    resolved === ".." ||
+    resolved.startsWith("../")
+  ) {
+    return target;
+  }
+
   const withExtension = path.posix.extname(resolved) ? resolved : `${resolved}.md`;
   const suffix = rawHash ? `#${rawHash}` : "";
 
   return `${toVaultUrl(withExtension)}${suffix}`;
 }
 
+function rewriteStandardMarkdownLinks(content, currentPath) {
+  let rewritten = "";
+
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] !== "[" || content[index - 1] === "!") {
+      rewritten += content[index];
+      continue;
+    }
+
+    const labelEnd = content.indexOf("](", index + 1);
+
+    if (labelEnd === -1) {
+      rewritten += content[index];
+      continue;
+    }
+
+    const closingIndex = content.indexOf(")", labelEnd + 2);
+
+    if (closingIndex === -1) {
+      rewritten += content[index];
+      continue;
+    }
+
+    const label = content.slice(index + 1, labelEnd);
+    const rawHref = content.slice(labelEnd + 2, closingIndex).trim();
+    const href =
+      rawHref.startsWith("<") && rawHref.endsWith(">")
+        ? rawHref.slice(1, -1)
+        : rawHref;
+    const hrefPath = href.split("#")[0];
+
+    if (/^[a-z]+:/i.test(href) || href.startsWith("#") || href.startsWith("/")) {
+      rewritten += content.slice(index, closingIndex + 1);
+      index = closingIndex;
+      continue;
+    }
+
+    if (path.posix.extname(hrefPath) === ".md" || !path.posix.extname(hrefPath)) {
+      rewritten += `[${label}](${relativeMarkdownTarget(href, currentPath)})`;
+      index = closingIndex;
+      continue;
+    }
+
+    rewritten += content.slice(index, closingIndex + 1);
+    index = closingIndex;
+  }
+
+  return rewritten;
+}
+
 function rewriteMarkdown(content, currentPath) {
-  const wikiLinked = rewriteWikiLinks(content);
-
-  return wikiLinked.replace(
-    /(!)?\[([^\]]+)\]\(([^)\s]+(?:\s+"[^"]*")?)\)/g,
-    (match, imagePrefix, label, rawHref) => {
-      if (imagePrefix) {
-        return match;
-      }
-
-      const href = rawHref.trim().replace(/^<|>$/g, "");
-      const hrefPath = href.split("#")[0];
-
-      if (/^[a-z]+:/i.test(href) || href.startsWith("#") || href.startsWith("/")) {
-        return match;
-      }
-
-      if (path.posix.extname(hrefPath) === ".md" || !path.posix.extname(hrefPath)) {
-        return `[${label}](${relativeMarkdownTarget(href, currentPath)})`;
-      }
-
-      return match;
-    },
-  );
+  return rewriteStandardMarkdownLinks(rewriteWikiLinks(content), currentPath);
 }
 
 function renderMarkdown(content, currentPath) {
@@ -273,7 +317,7 @@ function selectedRepoFrom(req) {
 }
 
 function createOctokit(req) {
-  return new Octokit({ auth: req.session.accessToken });
+  return octokitFactory(req);
 }
 
 async function listMarkdownFiles(req) {
@@ -308,6 +352,10 @@ function resolvePagePath(requestedPath, markdownFiles) {
   }
 
   const normalizedRequestedPath = normalizeRequestedPath(requestedPath);
+
+  if (normalizedRequestedPath === null) {
+    return null;
+  }
   const byLowercase = new Map(markdownFiles.map((filePath) => [filePath.toLowerCase(), filePath]));
 
   if (!normalizedRequestedPath) {
@@ -389,7 +437,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/auth/github", (req, res, next) => {
+app.get("/auth/github", authRateLimit, (req, res, next) => {
   if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
     return res.status(500).render("home", {
       isAuthenticated: false,
@@ -404,11 +452,12 @@ app.get("/auth/github", (req, res, next) => {
 
 app.get(
   "/auth/github/callback",
+  authRateLimit,
   passport.authenticate("github", { failureRedirect: "/" }),
   (_req, res) => res.redirect("/repos"),
 );
 
-app.post("/logout", (req, res, next) => {
+app.post("/logout", authRateLimit, (req, res, next) => {
   req.logout((error) => {
     if (error) {
       return next(error);
@@ -422,7 +471,7 @@ app.post("/logout", (req, res, next) => {
   });
 });
 
-app.get("/repos", ensureAuthenticated, async (req, res, next) => {
+app.get("/repos", authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     const octokit = createOctokit(req);
     const reposResponse = await octokit.rest.repos.listForAuthenticatedUser({
@@ -440,7 +489,7 @@ app.get("/repos", ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.post("/repos/select", ensureAuthenticated, async (req, res, next) => {
+app.post("/repos/select", authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     const [owner, repo] = (req.body.repository || "").split("/");
 
@@ -463,7 +512,7 @@ app.post("/repos/select", ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.get("/vault", ensureAuthenticated, async (req, res, next) => {
+app.get("/vault", authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -475,7 +524,7 @@ app.get("/vault", ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.get(/^\/vault\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
+app.get(/^\/vault\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -487,7 +536,7 @@ app.get(/^\/vault\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.get(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
+app.get(/^\/edit\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -513,7 +562,7 @@ app.get(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
+app.post(/^\/edit\/(.*)$/, authRateLimit, ensureAuthenticated, async (req, res, next) => {
   try {
     if (!selectedRepoFrom(req)) {
       return res.redirect("/repos");
@@ -552,7 +601,42 @@ app.use((error, _req, res, _next) => {
   });
 });
 
+if (process.env.NODE_ENV === "test") {
+  app.get("/test/sign-in", (req, res, next) => {
+    req.login(
+      {
+        id: "1",
+        username: "tester",
+        displayName: "Test User",
+        accessToken: "test-token",
+      },
+      (error) => {
+        if (error) {
+          next(error);
+          return;
+        }
+
+        req.session.csrfToken = createCsrfToken();
+        res.json({ csrfToken: req.session.csrfToken });
+      },
+    );
+  });
+
+  app.get("/test/session", (req, res) => {
+    res.json({
+      csrfToken: req.session.csrfToken,
+      selectedRepo: req.session.selectedRepo || null,
+    });
+  });
+}
+
 export { app, renderMarkdown, resolvePagePath, rewriteMarkdown };
+export function setOctokitFactory(factory) {
+  octokitFactory = factory;
+}
+export function resetOctokitFactory() {
+  octokitFactory = (req) => new Octokit({ auth: req.user?.accessToken });
+}
 
 export function startServer(port = PORT) {
   return app.listen(port, () => {

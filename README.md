@@ -2,6 +2,10 @@
 
 Pumice is a small web app for browsing and editing an Obsidian vault stored in a GitHub repository.
 
+## Requirements
+
+- Node.js 22.12 or newer
+
 ## Features
 
 - Sign in with GitHub
