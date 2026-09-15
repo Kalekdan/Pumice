@@ -13,7 +13,7 @@
         <p>Browse and edit your Obsidian markdown vault from a private GitHub repository.</p>
 
         <% if (!authConfigured) { %>
-          <p class="notice">Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and SESSION_SECRET to enable login.</p>
+          <p class="notice">This deployment is not configured yet. The app owner must set the GitHub OAuth and session environment variables before anyone can log in.</p>
         <% } %>
 
         <% if (isAuthenticated) { %>
