@@ -304,6 +304,9 @@ function renderMarkdown(content, currentPath) {
       input: ["type", "checked", "disabled"],
     },
     allowedSchemes: ["http", "https", "mailto"],
+    allowedSchemesByTag: {
+      a: ["http", "https", "mailto"],
+    },
     allowedSchemesAppliedToAttributes: ["href", "src"],
     allowProtocolRelative: false,
   });
@@ -490,11 +493,13 @@ app.get("/repos", ensureAuthenticated, async (req, res, next) => {
 
 app.post("/repos/select", ensureAuthenticated, async (req, res, next) => {
   try {
-    const [owner, repo] = (req.body.repository || "").split("/");
+    const repositoryParts = (req.body.repository || "").split("/");
 
-    if (!owner || !repo) {
+    if (repositoryParts.length !== 2 || repositoryParts.some((part) => !part)) {
       return res.redirect("/repos");
     }
+
+    const [owner, repo] = repositoryParts;
 
     const octokit = createOctokit(req);
     const repoResponse = await octokit.rest.repos.get({ owner, repo });
@@ -594,13 +599,6 @@ app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-app.use((error, _req, res, _next) => {
-  console.error(error);
-  res.status(500).render("error", {
-    message: "Something went wrong while processing your request.",
-  });
-});
-
 if (process.env.NODE_ENV === "test") {
   app.use("/test", authRateLimit);
 
@@ -631,6 +629,13 @@ if (process.env.NODE_ENV === "test") {
     });
   });
 }
+
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  res.status(500).render("error", {
+    message: "Something went wrong while processing your request.",
+  });
+});
 
 export { app, renderMarkdown, resolvePagePath, rewriteMarkdown };
 export function setOctokitFactory(factory) {

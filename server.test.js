@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
 
-const { app, resolvePagePath, rewriteMarkdown, setOctokitFactory, resetOctokitFactory } =
+const { app, resolvePagePath, rewriteMarkdown, renderMarkdown, setOctokitFactory, resetOctokitFactory } =
   await import("./server.js");
 
 test("resolvePagePath prefers README for the vault root", () => {
@@ -32,6 +32,12 @@ test("rewriteMarkdown preserves wiki aliases, malformed links, and upward traver
   assert.match(output, /\[Alias\]\(\/vault\/Folder\/Note\.md\)/);
   assert.match(output, /\[\[Broken/);
   assert.match(output, /\[Parent\]\(\.\.\/parent\.md\)/);
+});
+
+test("renderMarkdown preserves safe in-app vault links", () => {
+  const html = renderMarkdown("[[Linked Page]]", "notes/current.md");
+
+  assert.match(html, /href="\/vault\/Linked%20Page\.md"/);
 });
 
 test("home page renders successfully without GitHub credentials", async () => {
@@ -149,6 +155,48 @@ test("repository selection rejects invalid values", async () => {
       body: new URLSearchParams({
         _csrf: csrfToken,
         repository: "",
+      }),
+      redirect: "manual",
+    });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "/repos");
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+});
+
+test("repository selection rejects malformed multi-segment values", async () => {
+  const server = app.listen(0);
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const signInResponse = await fetch(`${baseUrl}/test/sign-in`, {
+      headers: { host: `localhost:${address.port}` },
+    });
+    const cookie = signInResponse.headers.get("set-cookie").split(";", 1)[0];
+    const { csrfToken } = await signInResponse.json();
+
+    const response = await fetch(`${baseUrl}/repos/select`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie,
+        host: `localhost:${address.port}`,
+      },
+      body: new URLSearchParams({
+        _csrf: csrfToken,
+        repository: "Kalekdan/vault/extra",
       }),
       redirect: "manual",
     });
