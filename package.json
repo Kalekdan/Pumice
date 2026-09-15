@@ -1,0 +1,32 @@
+{
+  "name": "pumice",
+  "version": "1.0.0",
+  "description": "GitHub-backed Obsidian vault browser and editor",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kalekdan/Pumice.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "marked": "^18.0.13",
+    "octokit": "^5.0.5",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
+    "sanitize-html": "^2.17.7"
+  }
+}

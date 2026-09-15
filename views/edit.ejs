@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edit <%= pageTitle %> · Pumice</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell shell--narrow">
+      <section class="card">
+        <div class="topbar">
+          <div>
+            <h1>Edit <%= pageTitle %></h1>
+            <p><%= repo.owner %>/<%= repo.repo %> · <%= currentPath %></p>
+          </div>
+          <a href="<%= vaultUrl(currentPath) %>">Cancel</a>
+        </div>
+        <form action="<%= editUrl(currentPath) %>" method="post" class="editor-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <label for="content">Markdown content</label>
+          <textarea id="content" name="content" rows="24"><%= fileContent %></textarea>
+          <button class="button" type="submit">Save changes</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= pageTitle %> · Pumice</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#page-content">Skip to page content</a>
+    <div class="shell shell--wide">
+      <aside class="sidebar">
+        <div class="sidebar__header">
+          <h1>Pumice</h1>
+          <% if (repo) { %>
+            <p><%= repo.owner %>/<%= repo.repo %></p>
+          <% } %>
+          <a href="/repos">Change repository</a>
+        </div>
+        <nav class="file-tree" aria-label="Vault files">
+          <% fileTree.forEach((node) => { %>
+            <%- include("partials/file-tree-node", { node }) %>
+          <% }) %>
+        </nav>
+      </aside>
+      <main class="page" id="page-content" tabindex="-1">
+        <header class="page__header">
+          <div>
+            <h2 id="page-title"><%= pageTitle %></h2>
+            <% if (currentPath) { %>
+              <p><%= currentPath %></p>
+            <% } %>
+          </div>
+          <% if (currentPath) { %>
+            <a class="button" href="<%= editUrl(currentPath) %>">Edit</a>
+          <% } %>
+        </header>
+        <article class="markdown" aria-labelledby="page-title"><%- bodyHtml %></article>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+<% if (node.type === "folder") { %>
+  <details class="tree-folder" <%= node.open ? 'open' : '' %>>
+    <summary><%= node.name %></summary>
+    <div class="tree-children">
+      <% node.children.forEach((child) => { %>
+        <%- include("partials/file-tree-node", { node: child }) %>
+      <% }) %>
+    </div>
+  </details>
+<% } else { %>
+  <a class="tree-file <%= node.active ? 'active' : '' %>" href="<%= vaultUrl(node.path) %>" <%= node.active ? 'aria-current="page"' : '' %>>
+    <%= node.name.replace(/\.md$/i, "") %>
+  </a>
+<% } %>
