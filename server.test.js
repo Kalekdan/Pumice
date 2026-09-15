@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
+process.env.ENABLE_TEST_ROUTES = "true";
 
 const {
   app,

@@ -18,6 +18,7 @@ const {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
   GITHUB_CALLBACK_URL,
+  ENABLE_TEST_ROUTES,
 } = process.env;
 
 const app = express();
@@ -125,7 +126,7 @@ app.use((req, res, next) => {
     return next();
   }
 
-  if (req.body._csrf !== req.session.csrfToken) {
+  if (req.body?._csrf !== req.session.csrfToken) {
     return res.status(403).render("error", {
       message: "Invalid CSRF token.",
     });
@@ -704,7 +705,7 @@ app.post(/^\/edit\/(.*)$/, ensureAuthenticated, async (req, res, next) => {
   }
 });
 
-if (process.env.NODE_ENV === "test") {
+if (process.env.NODE_ENV === "test" && ENABLE_TEST_ROUTES === "true") {
   app.use("/test", authRateLimit);
 
   app.get("/test/sign-in", (req, res, next) => {
