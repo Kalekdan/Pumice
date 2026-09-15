@@ -14,6 +14,7 @@
           <a href="/vault">Open current vault</a>
         </div>
         <form action="/repos/select" method="post" class="repo-list">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <% repos.forEach((repo) => { %>
             <label class="repo-option">
               <input

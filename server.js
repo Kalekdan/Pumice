@@ -5,6 +5,7 @@ import { Strategy as GitHubStrategy } from "passport-github2";
 import { Octokit } from "octokit";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,6 +31,11 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
   }),
 );
 
@@ -67,6 +73,63 @@ marked.setOptions({
   gfm: true,
 });
 
+const rateLimitState = new Map();
+
+function rateLimit({ windowMs, max }) {
+  return (req, res, next) => {
+    const key = req.ip || req.socket.remoteAddress || "anonymous";
+    const now = Date.now();
+    const existing = rateLimitState.get(key);
+
+    if (!existing || existing.resetAt <= now) {
+      rateLimitState.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    if (existing.count >= max) {
+      return res.status(429).render("error", {
+        message: "Too many requests. Please try again shortly.",
+      });
+    }
+
+    existing.count += 1;
+    return next();
+  };
+}
+
+function createCsrfToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function csrfTokenFor(req) {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = createCsrfToken();
+  }
+
+  return req.session.csrfToken;
+}
+
+app.use(rateLimit({ windowMs: 60_000, max: 180 }));
+app.use((req, res, next) => {
+  res.locals.csrfToken = csrfTokenFor(req);
+  next();
+});
+app.use((req, res, next) => {
+  if (req.method !== "POST") {
+    return next();
+  }
+
+  if (req.body._csrf !== req.session.csrfToken) {
+    return res.status(403).render("error", {
+      message: "Invalid CSRF token.",
+    });
+  }
+
+  req.session.csrfToken = createCsrfToken();
+  res.locals.csrfToken = req.session.csrfToken;
+  return next();
+});
+
 function encodeVaultPath(filePath = "") {
   return filePath
     .split("/")
@@ -88,11 +151,51 @@ function titleFromPath(filePath = "") {
 }
 
 function normalizeRequestedPath(requestedPath = "") {
-  return requestedPath
+  let normalizedPath = requestedPath
     .split("/")
     .map((part) => decodeURIComponent(part))
-    .join("/")
-    .replace(/^\/+|\/+$/g, "");
+    .join("/");
+
+  while (normalizedPath.startsWith("/")) {
+    normalizedPath = normalizedPath.slice(1);
+  }
+
+  while (normalizedPath.endsWith("/")) {
+    normalizedPath = normalizedPath.slice(0, -1);
+  }
+
+  return normalizedPath;
+}
+
+function rewriteWikiLinks(content) {
+  let rewritten = "";
+
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] !== "[" || content[index + 1] !== "[") {
+      rewritten += content[index];
+      continue;
+    }
+
+    const closingIndex = content.indexOf("]]", index + 2);
+
+    if (closingIndex === -1) {
+      rewritten += content[index];
+      continue;
+    }
+
+    const rawTarget = content.slice(index + 2, closingIndex);
+    const [target, alias] = rawTarget.split("|");
+    const trimmedTarget = target.trim();
+    const label = (alias || titleFromPath(trimmedTarget)).trim();
+    const normalizedTarget = path.posix.extname(trimmedTarget)
+      ? trimmedTarget
+      : `${trimmedTarget}.md`;
+
+    rewritten += `[${label}](${toVaultUrl(normalizedTarget)})`;
+    index = closingIndex + 1;
+  }
+
+  return rewritten;
 }
 
 function relativeMarkdownTarget(target, currentPath) {
@@ -116,16 +219,7 @@ function relativeMarkdownTarget(target, currentPath) {
 }
 
 function rewriteMarkdown(content, currentPath) {
-  const wikiLinked = content.replace(/\[\[([^\]\n]+)\]\]/g, (_match, rawTarget) => {
-    const [target, alias] = rawTarget.split("|");
-    const trimmedTarget = target.trim();
-    const label = (alias || titleFromPath(trimmedTarget)).trim();
-    const normalizedTarget = path.posix.extname(trimmedTarget)
-      ? trimmedTarget
-      : `${trimmedTarget}.md`;
-
-    return `[${label}](${toVaultUrl(normalizedTarget)})`;
-  });
+  const wikiLinked = rewriteWikiLinks(content);
 
   return wikiLinked.replace(
     /(!)?\[([^\]]+)\]\(([^)\s]+(?:\s+"[^"]*")?)\)/g,
@@ -135,12 +229,13 @@ function rewriteMarkdown(content, currentPath) {
       }
 
       const href = rawHref.trim().replace(/^<|>$/g, "");
+      const hrefPath = href.split("#")[0];
 
       if (/^[a-z]+:/i.test(href) || href.startsWith("#") || href.startsWith("/")) {
         return match;
       }
 
-      if (path.posix.extname(href) === ".md" || !path.posix.extname(href.split("#")[0])) {
+      if (path.posix.extname(hrefPath) === ".md" || !path.posix.extname(hrefPath)) {
         return `[${label}](${relativeMarkdownTarget(href, currentPath)})`;
       }
 

@@ -27,7 +27,7 @@
       <main class="page">
         <header class="page__header">
           <div>
-            <h2><%= pageTitle %></h2>
+            <h2 id="page-title"><%= pageTitle %></h2>
             <% if (currentPath) { %>
               <p><%= currentPath %></p>
             <% } %>
@@ -36,7 +36,7 @@
             <a class="button" href="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Edit</a>
           <% } %>
         </header>
-        <article class="markdown"><%- bodyHtml %></article>
+        <article class="markdown" aria-labelledby="page-title"><%- bodyHtml %></article>
       </main>
     </div>
   </body>

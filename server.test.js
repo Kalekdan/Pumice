@@ -13,12 +13,12 @@ test("resolvePagePath prefers README for the vault root", () => {
 
 test("rewriteMarkdown rewrites wiki links and markdown links to vault routes", () => {
   const output = rewriteMarkdown(
-    "[[Daily Note]] and [Sibling](sibling.md) and [Child](nested/child)",
+    "[[Daily Note]] and [Sibling](sibling.md#section) and [Child](nested/child)",
     "notes/current.md",
   );
 
   assert.match(output, /\[Daily Note\]\(\/vault\/Daily%20Note\.md\)/);
-  assert.match(output, /\[Sibling\]\(\/vault\/notes\/sibling\.md\)/);
+  assert.match(output, /\[Sibling\]\(\/vault\/notes\/sibling\.md#section\)/);
   assert.match(output, /\[Child\]\(\/vault\/notes\/nested\/child\.md\)/);
 });
 

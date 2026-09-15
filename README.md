@@ -12,7 +12,7 @@ Pumice is a small web app for browsing and editing an Obsidian vault stored in a
 
 ## Setup
 
-1. Create a GitHub OAuth app.
+1. Create a GitHub OAuth app and set its callback URL to match `GITHUB_CALLBACK_URL` (or use `http://localhost:3000/auth/github/callback` if you keep the default).
 2. Set these environment variables:
    - `GITHUB_CLIENT_ID`
    - `GITHUB_CLIENT_SECRET`

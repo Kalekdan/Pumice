@@ -17,6 +17,7 @@
           <a href="/vault/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>">Cancel</a>
         </div>
         <form action="/edit/<%= currentPath.split('/').map(encodeURIComponent).join('/') %>" method="post" class="editor-form">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <textarea name="content" rows="24"><%= fileContent %></textarea>
           <button class="button" type="submit">Save changes</button>
         </form>
