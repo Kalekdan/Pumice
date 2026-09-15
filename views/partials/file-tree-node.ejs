@@ -8,7 +8,7 @@
     </div>
   </details>
 <% } else { %>
-  <a class="tree-file <%= node.active ? 'active' : '' %>" href="<%= vaultUrl(node.path) %>">
+  <a class="tree-file <%= node.active ? 'active' : '' %>" href="<%= vaultUrl(node.path) %>" <%= node.active ? 'aria-current="page"' : '' %>>
     <%= node.name.replace(/\.md$/i, "") %>
   </a>
 <% } %>

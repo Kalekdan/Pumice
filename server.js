@@ -384,9 +384,6 @@ function renderMarkdown(content, currentPath) {
       input: ["type", "checked", "disabled"],
     },
     allowedSchemes: ["http", "https", "mailto"],
-    allowedSchemesByTag: {
-      a: ["http", "https", "mailto"],
-    },
     allowedSchemesAppliedToAttributes: ["href", "src"],
     allowProtocolRelative: false,
   });
@@ -566,6 +563,7 @@ app.get("/auth/github", (req, res, next) => {
       authConfigured: false,
       selectedRepo: null,
       user: null,
+      csrfToken: res.locals.csrfToken,
     });
   }
 

@@ -57,9 +57,13 @@ test("rewriteMarkdown preserves wiki aliases, malformed links, and upward traver
 });
 
 test("renderMarkdown preserves safe in-app vault links", () => {
-  const html = renderMarkdown("[[Linked Page]]", "notes/current.md");
+  const html = renderMarkdown(
+    "[[Linked Page]] and [Sibling](sibling.md#section)",
+    "notes/current.md",
+  );
 
   assert.match(html, /href="\/vault\/Linked%20Page\.md"/);
+  assert.match(html, /href="\/vault\/notes\/sibling\.md#section"/);
 });
 
 test("normalizeContentForSave preserves the existing file line endings", () => {
